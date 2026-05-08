@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { ListVideo, Plus, Trash2, Video, Tv, Edit2, X, Save } from 'lucide-react';
+import { ListVideo, Plus, Trash2, Video, Tv, Edit2, X } from 'lucide-react';
 
 export default function Playlists() {
   const [loading, setLoading] = useState(true);

@@ -1,7 +1,6 @@
-import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { LayoutDashboard, MonitorPlay, Image as ImageIcon, ListVideo, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, MonitorPlay, ListVideo, Image as ImageIcon, LogOut } from 'lucide-react';
 
 export default function Layout() {
   const { signOut, user } = useAuthStore();

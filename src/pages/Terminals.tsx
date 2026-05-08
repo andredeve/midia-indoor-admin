@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { MonitorPlay, CheckCircle2, XCircle, Clock, Edit2, Trash2, X, Plus } from 'lucide-react';
+import { MonitorPlay, Clock, Edit2, Trash2, X, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

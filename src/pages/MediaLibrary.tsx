@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { Upload, Film, Image as ImageIcon, Trash2, FileVideo, AlertTriangle } from 'lucide-react';
+import { Upload, Film, Trash2, FileVideo, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
