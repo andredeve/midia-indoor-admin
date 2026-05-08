@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { ListVideo, Plus, Trash2, Video, Tv } from 'lucide-react';
+import { ListVideo, Plus, Trash2, Video, Tv, Edit2, X, Save } from 'lucide-react';
 
 export default function Playlists() {
   const [loading, setLoading] = useState(true);
@@ -9,108 +9,154 @@ export default function Playlists() {
   const [terminals, setTerminals] = useState<any[]>([]);
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   
-  // States para o form de nova playlist
+  // States para o form
   const [showForm, setShowForm] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [playlistName, setPlaylistName] = useState('');
   const [selectedTerminal, setSelectedTerminal] = useState('');
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   
   const { user } = useAuthStore();
 
-  useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
-
-  async function loadData() {
+  const loadData = async () => {
     setLoading(true);
     try {
       const { data: userData } = await supabase.from('users').select('org_id').eq('id', user?.id).single();
       if (!userData) return;
 
-      // Buscar terminais para o dropdown
       const { data: tData } = await supabase.from('terminals').select('*').eq('org_id', userData.org_id);
       
       let pData: any[] = [];
       if (tData && tData.length > 0) {
         const terminalIds = tData.map(t => t.id);
-        // Buscar playlists existentes vinculadas aos terminais do org
         const { data } = await supabase
           .from('playlists')
-          .select('*, terminals(name), playlist_items(media_id)')
+          .select('*, terminals(name), playlist_items(media_id, order)')
           .in('terminal_id', terminalIds)
           .order('created_at', { ascending: false });
         pData = data || [];
       }
       
-      // Buscar mídias disponíveis
       const { data: mData } = await supabase.from('media_files').select('*').eq('org_id', userData.org_id);
 
-      if (pData) setPlaylists(pData);
-      if (tData) setTerminals(tData);
-      if (mData) setMediaFiles(mData);
+      setPlaylists(pData);
+      setTerminals(tData || []);
+      setMediaFiles(mData || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleCreatePlaylist(e: React.FormEvent) {
+  useEffect(() => {
+    if (user) loadData();
+  }, [user]);
+
+  const handleEdit = (playlist: any) => {
+    setEditingId(playlist.id);
+    setPlaylistName(playlist.name);
+    setSelectedTerminal(playlist.terminal_id);
+    
+    // Pegar IDs das mídias ordenadas
+    const mediaIds = [...playlist.playlist_items]
+      .sort((a, b) => a.order - b.order)
+      .map(item => item.media_id);
+    
+    setSelectedMedia(mediaIds);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setPlaylistName('');
+    setSelectedTerminal('');
+    setSelectedMedia([]);
+  };
+
+  const handleSavePlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPlaylistName || !selectedTerminal || selectedMedia.length === 0) {
+    if (!playlistName || !selectedTerminal || selectedMedia.length === 0) {
       alert('Preencha nome, terminal e selecione ao menos uma mídia.');
       return;
     }
 
+    setIsSaving(true);
     try {
-      const { data: userData } = await supabase.from('users').select('org_id').eq('id', user?.id).single();
-      
-      // Desativar playlist anterior deste terminal
-      await supabase.from('playlists').update({ is_active: false }).eq('terminal_id', selectedTerminal);
+      if (editingId) {
+        // MODO EDIÇÃO
+        // 1. Atualizar dados básicos e incrementar versão
+        const { data: currentPlaylist } = await supabase.from('playlists').select('version').eq('id', editingId).single();
+        const nextVersion = (currentPlaylist?.version || 1) + 1;
 
-      // Criar a nova playlist
-      const { data: newPlaylist, error: pError } = await supabase.from('playlists').insert({
-        terminal_id: selectedTerminal,
-        name: newPlaylistName,
-        is_active: true,
-        version: 1
-      }).select().single();
+        const { error: pError } = await supabase.from('playlists').update({
+          name: playlistName,
+          terminal_id: selectedTerminal,
+          version: nextVersion,
+          is_active: true
+        }).eq('id', editingId);
 
-      if (pError) throw pError;
+        if (pError) throw pError;
 
-      // Inserir os itens na playlist
-      const itemsToInsert = selectedMedia.map((mediaId, index) => ({
-        playlist_id: newPlaylist.id,
-        media_id: mediaId,
-        order: index + 1,
-        duration_override: 15 // Padrão 15 segundos para imagens, vídeos usam duração natural
-      }));
+        // 2. Substituir itens (delete + insert)
+        await supabase.from('playlist_items').delete().eq('playlist_id', editingId);
+        
+        const itemsToInsert = selectedMedia.map((mediaId, index) => ({
+          playlist_id: editingId,
+          media_id: mediaId,
+          order: index + 1,
+          duration_override: 15
+        }));
 
-      const { error: iError } = await supabase.from('playlist_items').insert(itemsToInsert);
-      if (iError) throw iError;
+        const { error: iError } = await supabase.from('playlist_items').insert(itemsToInsert);
+        if (iError) throw iError;
 
-      // Limpar form e recarregar
-      setNewPlaylistName('');
-      setSelectedTerminal('');
-      setSelectedMedia([]);
-      setShowForm(false);
+        alert('Playlist atualizada! O terminal irá sincronizar em instantes.');
+      } else {
+        // MODO CRIAÇÃO
+        // Desativar outras playlists do terminal
+        await supabase.from('playlists').update({ is_active: false }).eq('terminal_id', selectedTerminal);
+
+        const { data: newPlaylist, error: pError } = await supabase.from('playlists').insert({
+          terminal_id: selectedTerminal,
+          name: playlistName,
+          is_active: true,
+          version: 1
+        }).select().single();
+
+        if (pError) throw pError;
+
+        const itemsToInsert = selectedMedia.map((mediaId, index) => ({
+          playlist_id: newPlaylist.id,
+          media_id: mediaId,
+          order: index + 1,
+          duration_override: 15
+        }));
+
+        const { error: iError } = await supabase.from('playlist_items').insert(itemsToInsert);
+        if (iError) throw iError;
+
+        alert('Playlist criada com sucesso!');
+      }
+
+      handleCancel();
       loadData();
-      
-      alert('Playlist criada com sucesso! O terminal começará a baixar os arquivos.');
-
     } catch (error) {
       console.error(error);
-      alert('Erro ao criar playlist. Verifique o console.');
+      alert('Erro ao salvar playlist.');
+    } finally {
+      setIsSaving(false);
     }
-  }
+  };
 
-  async function deletePlaylist(id: string) {
+  const deletePlaylist = async (id: string) => {
     if (!confirm('Tem certeza que deseja apagar esta playlist?')) return;
     await supabase.from('playlists').delete().eq('id', id);
     loadData();
-  }
+  };
 
   const toggleMediaSelection = (mediaId: string) => {
     setSelectedMedia(prev => 
@@ -118,40 +164,50 @@ export default function Playlists() {
     );
   };
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}><div className="loader" style={{margin: '0 auto', borderColor: 'var(--primary) transparent var(--primary) transparent'}} /></div>;
+  if (loading && !showForm) return <div style={{ padding: '2rem', textAlign: 'center' }}><div className="loader" style={{margin: '0 auto'}} /></div>;
 
   return (
-    <div>
+    <div style={{ paddingBottom: '4rem' }}>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Playlists</h1>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          <Plus size={18} /> {showForm ? 'Cancelar' : 'Nova Playlist'}
-        </button>
+        <h1 className="page-title">Playlists</h1>
+        {!showForm && (
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            <Plus size={18} /> Nova Playlist
+          </button>
+        )}
       </div>
 
       {showForm && (
-        <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-          <h2 style={{ marginBottom: '1.5rem', color: 'white' }}>Criar Nova Playlist</h2>
-          <form onSubmit={handleCreatePlaylist}>
-            <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem', border: '1px solid var(--primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>
+              {editingId ? 'Editando Playlist' : 'Nova Playlist'}
+            </h2>
+            <button className="icon-btn" onClick={handleCancel}><X size={24} /></button>
+          </div>
+
+          <form onSubmit={handleSavePlaylist}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nome da Playlist</label>
+                <label className="form-label">Nome da Playlist</label>
                 <input 
                   type="text" 
-                  value={newPlaylistName} 
-                  onChange={e => setNewPlaylistName(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)', color: 'white' }}
-                  placeholder="Ex: Promoções de Verão"
+                  className="form-input"
+                  value={playlistName} 
+                  onChange={e => setPlaylistName(e.target.value)}
+                  placeholder="Ex: Menu do Dia"
+                  required
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Vincular a qual Terminal (TV)?</label>
+                <label className="form-label">Terminal Vinculado</label>
                 <select 
+                  className="form-input"
                   value={selectedTerminal} 
                   onChange={e => setSelectedTerminal(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)', color: 'white' }}
+                  required
                 >
-                  <option value="" style={{ color: 'black' }}>-- Selecione um Terminal --</option>
+                  <option value="" style={{ color: 'black' }}>Selecione uma TV...</option>
                   {terminals.map(t => (
                     <option key={t.id} value={t.id} style={{ color: 'black' }}>{t.name}</option>
                   ))}
@@ -159,81 +215,131 @@ export default function Playlists() {
               </div>
             </div>
 
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Selecione as Mídias (Ordem de Seleção = Ordem de Reprodução)</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-              {mediaFiles.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)' }}>Nenhuma mídia na biblioteca. Faça upload primeiro.</p>
-              ) : (
-                mediaFiles.map(media => {
-                  const isSelected = selectedMedia.includes(media.id);
-                  const orderIndex = selectedMedia.indexOf(media.id) + 1;
-                  return (
-                    <div 
-                      key={media.id} 
-                      onClick={() => toggleMediaSelection(media.id)}
-                      style={{ 
-                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--panel-border)', 
-                        borderRadius: '8px', 
-                        padding: '1rem', 
-                        cursor: 'pointer',
-                        background: isSelected ? 'rgba(0, 240, 255, 0.1)' : 'transparent',
-                        position: 'relative'
-                      }}
-                    >
-                      {isSelected && (
-                        <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--primary)', color: 'black', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                          {orderIndex}
-                        </div>
-                      )}
-                      <Video size={24} style={{ marginBottom: '0.5rem', color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }} />
-                      <p style={{ fontSize: '0.85rem', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.name}</p>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'white' }}>Selecione as Mídias</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Clique nas mídias para adicionar/remover. A ordem de seleção define a ordem de reprodução.
+            </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+              {mediaFiles.map(media => {
+                const isSelected = selectedMedia.includes(media.id);
+                const orderIndex = selectedMedia.indexOf(media.id) + 1;
+                return (
+                  <div 
+                    key={media.id} 
+                    onClick={() => toggleMediaSelection(media.id)}
+                    style={{ 
+                      border: isSelected ? '2px solid var(--primary)' : '1px solid var(--panel-border)', 
+                      borderRadius: '12px', 
+                      padding: '1rem', 
+                      cursor: 'pointer',
+                      background: isSelected ? 'rgba(0, 240, 255, 0.1)' : 'rgba(255,255,255,0.02)',
+                      position: 'relative',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {isSelected && (
+                      <div style={{ 
+                        position: 'absolute', top: '-8px', right: '-8px', 
+                        background: 'var(--primary)', color: 'black', 
+                        width: '28px', height: '28px', borderRadius: '50%', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 0 10px var(--primary)'
+                      }}>
+                        {orderIndex}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Video size={20} color={isSelected ? 'var(--primary)' : 'var(--text-muted)'} />
+                      <div style={{ overflow: 'hidden' }}>
+                        <p style={{ fontSize: '0.9rem', color: 'white', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{media.name}</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{media.file_type.split('/')[1].toUpperCase()}</p>
+                      </div>
                     </div>
-                  );
-                })
-              )}
+                  </div>
+                );
+              })}
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-              Salvar Playlist e Sincronizar
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button type="button" className="btn" style={{ flex: 1 }} onClick={handleCancel}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={isSaving}>
+                {isSaving ? 'Salvando...' : editingId ? 'Atualizar Playlist' : 'Criar Playlist'}
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      {playlists.length === 0 && !showForm ? (
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-          <ListVideo size={48} color="var(--panel-border)" style={{ margin: '0 auto 1rem' }} />
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Nenhuma Playlist Criada</h3>
-          <p style={{ color: 'var(--text-muted)', maxWidth: '500px', margin: '0 auto' }}>
-            Crie sua primeira lista de reprodução para começar a enviar conteúdo para suas telas.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          {playlists.map(playlist => (
-            <div key={playlist.id} className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem' }}>
+      <div style={{ display: 'grid', gap: '1rem' }}>
+        {playlists.map(playlist => (
+          <div key={playlist.id} className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <div style={{ padding: '0.75rem', backgroundColor: 'rgba(0, 240, 255, 0.05)', borderRadius: '12px' }}>
+                <ListVideo size={24} color="var(--primary)" />
+              </div>
               <div>
-                <h3 style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
-                  {playlist.name} 
-                  {playlist.is_active && <span style={{ fontSize: '0.7rem', background: 'var(--success)', color: 'black', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>ATIVA</span>}
+                <h3 style={{ color: 'white', fontWeight: 700, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {playlist.name}
+                  {playlist.is_active && <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--success-color)', color: 'black', padding: '2px 8px', borderRadius: '20px' }}>ATIVA</span>}
                 </h3>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Tv size={14} /> {playlist.terminals?.name || 'Nenhum Terminal'}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Video size={14} /> {playlist.playlist_items?.length || 0} mídias</span>
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <Tv size={14} /> {playlist.terminals?.name || 'Sem terminal'}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <Video size={14} /> {playlist.playlist_items?.length || 0} mídias
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    v{playlist.version}
+                  </div>
                 </div>
               </div>
-              
-              <button 
-                onClick={() => deletePlaylist(playlist.id)}
-                style={{ background: 'transparent', border: 'none', color: '#ff4444', cursor: 'pointer', padding: '0.5rem' }}
-                title="Apagar Playlist"
-              >
-                <Trash2 size={20} />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="icon-btn" onClick={() => handleEdit(playlist)} title="Editar Playlist">
+                <Edit2 size={18} />
+              </button>
+              <button className="icon-btn text-danger" onClick={() => deletePlaylist(playlist.id)} title="Excluir Playlist">
+                <Trash2 size={18} />
               </button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
+      
+      <style>{`
+        .icon-btn {
+          background: rgba(255, 255, 255, 0.05);
+          border: none;
+          color: var(--text-muted);
+          padding: 0.6rem;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .icon-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          transform: translateY(-2px);
+        }
+        .icon-btn.text-danger:hover {
+          color: var(--danger-color);
+          background: rgba(239, 68, 68, 0.1);
+        }
+        .form-label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+        .form-input { 
+          width: 100%; 
+          padding: 0.8rem; 
+          border-radius: 8px; 
+          background: rgba(255,255,255,0.03); 
+          border: 1px solid var(--panel-border); 
+          color: white;
+          outline: none;
+        }
+        .form-input:focus { border-color: var(--primary); }
+      `}</style>
     </div>
   );
 }
