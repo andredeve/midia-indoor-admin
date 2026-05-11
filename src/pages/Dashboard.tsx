@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { MonitorPlay, CheckCircle2, Play, Eye, BarChart3, Clock } from 'lucide-react';
+import { MonitorPlay, Play, BarChart3, Clock } from 'lucide-react';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ 
