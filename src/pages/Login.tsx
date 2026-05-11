@@ -35,7 +35,17 @@ export default function Login() {
   return (
     <div className="auth-container">
       <div className="glass-panel auth-card">
-        <h1 className="auth-title">Mídia Indoor</h1>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <img 
+            src="/logo.png" 
+            alt="GYM PLAY Mídia" 
+            style={{ 
+              width: '200px', 
+              height: 'auto',
+              filter: 'drop-shadow(0 0 20px rgba(212, 255, 0, 0.2))'
+            }} 
+          />
+        </div>
         <p className="auth-subtitle">Painel Administrativo</p>
         
         {error && (

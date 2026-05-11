@@ -9,16 +9,18 @@ export default function Layout() {
     <div className="app-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-header" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '2rem 1.5rem', gap: '0.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <MonitorPlay size={28} color="var(--primary-color)" />
-            <span style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: '#ffffff' }}>
-              GYM <span style={{ color: 'var(--primary-color)' }}>PLAY</span>
-            </span>
-          </div>
-          <span style={{ fontSize: '0.7rem', letterSpacing: '3px', color: 'var(--text-muted)', textTransform: 'uppercase', alignSelf: 'flex-start', marginLeft: '2.5rem' }}>
-            — Mídia —
-          </span>
+        <div className="sidebar-header" style={{ padding: '1.5rem', justifyContent: 'center' }}>
+          <img 
+            src="/logo.png" 
+            alt="GYM PLAY Mídia" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '180px', 
+              height: 'auto',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 12px rgba(212, 255, 0, 0.15))'
+            }} 
+          />
         </div>
         
         <nav className="sidebar-nav">
@@ -59,7 +61,7 @@ export default function Layout() {
               <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{user?.user_metadata?.name || 'Administrador'}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.email}</div>
             </div>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#000', fontSize: '0.875rem' }}>
               {user?.user_metadata?.name?.charAt(0) || 'A'}
             </div>
           </div>

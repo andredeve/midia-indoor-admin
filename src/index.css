@@ -241,12 +241,13 @@ ul {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background-image: radial-gradient(circle at center, #1f2937 0%, #0b0f19 100%);
+  background-color: #050505;
+  background-image: radial-gradient(circle at 50% 30%, rgba(212, 255, 0, 0.06) 0%, transparent 60%);
 }
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   padding: 2.5rem;
 }
 
@@ -262,4 +263,12 @@ ul {
   color: var(--text-muted);
   margin-bottom: 2rem;
   font-size: 0.875rem;
+}
+
+/* Sidebar logo area */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--panel-border);
 }
