@@ -1,75 +1,147 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { MonitorPlay, CheckCircle2, XCircle } from 'lucide-react';
+import { MonitorPlay, CheckCircle2, Play, Eye, BarChart3, Clock } from 'lucide-react';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: 0, online: 0, offline: 0 });
+  const [stats, setStats] = useState({ 
+    total: 0, 
+    online: 0, 
+    totalPlays: 0,
+    activeNow: 0 
+  });
+  const [topMedia, setTopMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadStats() {
-      const { data, error } = await supabase.from('terminals').select('status');
-      if (data && !error) {
+    async function loadDashboardData() {
+      // 1. Stats de Terminais
+      const { data: terminals } = await supabase.from('terminals').select('status, last_seen_at');
+      
+      // 2. Total de Plays (últimas 24h)
+      const { count: totalPlays } = await supabase
+        .from('terminal_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_type', 'playback_start');
+
+      // 3. Top Mídias
+      const { data: stats } = await supabase
+        .from('playback_stats')
+        .select('*, media:media_files(name)')
+        .order('total_plays', { ascending: false })
+        .limit(5);
+
+      if (terminals) {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
         setStats({
-          total: data.length,
-          online: data.filter(t => t.status === 'online').length,
-          offline: data.filter(t => t.status === 'offline').length,
+          total: terminals.length,
+          online: terminals.filter(t => t.status === 'online').length,
+          totalPlays: totalPlays || 0,
+          activeNow: terminals.filter(t => t.last_seen_at && new Date(t.last_seen_at) > fiveMinutesAgo).length
         });
       }
+
+      if (stats) {
+        setTopMedia(stats);
+      }
+      
       setLoading(false);
     }
-    loadStats();
+    loadDashboardData();
   }, []);
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Visão Geral</h1>
+        <h1 className="page-title">Métricas em Tempo Real</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        {/* Card 1 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        {/* Total de TVs */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ padding: '0.75rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary-color)', borderRadius: '8px' }}>
               <MonitorPlay size={24} />
             </div>
             <div>
-              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total de TVs</h3>
+              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Terminais</h3>
               <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{loading ? '-' : stats.total}</div>
             </div>
           </div>
         </div>
 
-        {/* Card 2 */}
+        {/* TVs Online Agora */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success-color)', borderRadius: '8px' }}>
-              <CheckCircle2 size={24} />
+              <Clock size={24} />
             </div>
             <div>
-              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>TVs Online</h3>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{loading ? '-' : stats.online}</div>
+              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Ativos Agora</h3>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{loading ? '-' : stats.activeNow}</div>
             </div>
           </div>
         </div>
 
-        {/* Card 3 */}
+        {/* Total de Exibições */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger-color)', borderRadius: '8px' }}>
-              <XCircle size={24} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', borderRadius: '8px' }}>
+              <Play size={24} />
             </div>
             <div>
-              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>TVs Offline</h3>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{loading ? '-' : stats.offline}</div>
+              <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total Exibições</h3>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{loading ? '-' : stats.totalPlays}</div>
             </div>
           </div>
         </div>
       </div>
-      
-      <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <p>Em breve: Mais funcionalidades e telas como "Biblioteca de Mídias" e "Playlists" serão adicionadas aqui!</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+        {/* Tabela de Conteúdos mais vistos */}
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <BarChart3 size={20} color="var(--primary-color)" />
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Ranking de Conteúdo</h2>
+          </div>
+          
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Mídia</th>
+                <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Exibições</th>
+                <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Última vez</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topMedia.map((item, index) => (
+                <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '1rem 0', fontWeight: 500 }}>{item.media?.name || 'Mídia Removida'}</td>
+                  <td style={{ padding: '1rem 0' }}>
+                    <span style={{ backgroundColor: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.875rem' }}>
+                      {item.total_plays}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                    {new Date(item.last_played_at).toLocaleTimeString()}
+                  </td>
+                </tr>
+              ))}
+              {topMedia.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhum dado de reprodução ainda.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Info lateral */}
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Dica do Sistema</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+            Os terminais enviam um sinal de atividade (heartbeat) a cada 30 segundos. Se um terminal ficar mais de 5 minutos sem enviar sinal, ele será considerado "Inativo" no gráfico acima.
+          </p>
+        </div>
       </div>
     </div>
   );
