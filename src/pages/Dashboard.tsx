@@ -31,12 +31,12 @@ export default function Dashboard() {
         .limit(5);
 
       if (terminals) {
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
         setStats({
           total: terminals.length,
           online: terminals.filter(t => t.status === 'online').length,
           totalPlays: totalPlays || 0,
-          activeNow: terminals.filter(t => t.last_seen_at && new Date(t.last_seen_at) > fiveMinutesAgo).length
+          activeNow: terminals.filter(t => t.last_seen_at && new Date(t.last_seen_at) > threeMinutesAgo).length
         });
       }
 
@@ -139,7 +139,7 @@ export default function Dashboard() {
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Dica do Sistema</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-            Os terminais enviam um sinal de atividade (heartbeat) a cada 30 segundos. Se um terminal ficar mais de 5 minutos sem enviar sinal, ele será considerado "Inativo" no gráfico acima.
+            Os terminais enviam um sinal de atividade (heartbeat) a cada 60 segundos. Se um terminal ficar mais de 3 minutos sem enviar sinal, ele será considerado "Inativo" no gráfico de atividade.
           </p>
         </div>
       </div>
