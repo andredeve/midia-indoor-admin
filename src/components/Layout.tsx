@@ -9,9 +9,16 @@ export default function Layout() {
     <div className="app-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-header">
-          <MonitorPlay size={24} color="var(--primary-color)" />
-          <span>Mídia Indoor</span>
+        <div className="sidebar-header" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '2rem 1.5rem', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <MonitorPlay size={28} color="var(--primary-color)" />
+            <span style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: '#ffffff' }}>
+              GYM <span style={{ color: 'var(--primary-color)' }}>PLAY</span>
+            </span>
+          </div>
+          <span style={{ fontSize: '0.7rem', letterSpacing: '3px', color: 'var(--text-muted)', textTransform: 'uppercase', alignSelf: 'flex-start', marginLeft: '2.5rem' }}>
+            — Mídia —
+          </span>
         </div>
         
         <nav className="sidebar-nav">

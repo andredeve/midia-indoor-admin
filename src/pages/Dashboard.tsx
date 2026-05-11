@@ -59,7 +59,7 @@ export default function Dashboard() {
         {/* Total de TVs */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary-color)', borderRadius: '8px' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--primary-glow)', color: 'var(--primary-color)', borderRadius: '12px' }}>
               <MonitorPlay size={24} />
             </div>
             <div>
@@ -72,7 +72,7 @@ export default function Dashboard() {
         {/* TVs Online Agora */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success-color)', borderRadius: '8px' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--primary-glow)', color: 'var(--primary-color)', borderRadius: '12px' }}>
               <Clock size={24} />
             </div>
             <div>
@@ -85,7 +85,7 @@ export default function Dashboard() {
         {/* Total de Exibições */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', borderRadius: '8px' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', borderRadius: '12px' }}>
               <Play size={24} />
             </div>
             <div>
@@ -106,7 +106,7 @@ export default function Dashboard() {
           
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--panel-border)' }}>
                 <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Mídia</th>
                 <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Exibições</th>
                 <th style={{ padding: '1rem 0', color: 'var(--text-muted)', fontWeight: 500 }}>Última vez</th>
@@ -114,10 +114,10 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {topMedia.map((item, index) => (
-                <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                   <td style={{ padding: '1rem 0', fontWeight: 500 }}>{item.media?.name || 'Mídia Removida'}</td>
                   <td style={{ padding: '1rem 0' }}>
-                    <span style={{ backgroundColor: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.875rem' }}>
+                    <span style={{ backgroundColor: 'var(--primary-glow)', color: 'var(--primary-color)', padding: '0.35rem 0.85rem', borderRadius: '20px', fontSize: '0.875rem', fontWeight: 600 }}>
                       {item.total_plays}
                     </span>
                   </td>
