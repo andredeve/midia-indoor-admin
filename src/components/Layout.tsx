@@ -17,8 +17,7 @@ export default function Layout() {
               width: '100%', 
               maxWidth: '180px', 
               height: 'auto',
-              objectFit: 'contain',
-              filter: 'drop-shadow(0 0 12px rgba(212, 255, 0, 0.15))'
+              objectFit: 'contain'
             }} 
           />
         </div>
