@@ -71,3 +71,10 @@ export default defineConfig([
   },
 ])
 ```
+
+## Deployment
+
+This project is configured to deploy automatically to Netlify on every push to the master branch.
+- Build Command: npm run build
+- Publish Directory: dist
+- Redirects: Managed via netlify.toml
