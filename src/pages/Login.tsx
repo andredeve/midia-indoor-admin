@@ -60,7 +60,7 @@ export default function Login() {
               id="email"
               type="email" 
               className="input-field" 
-              placeholder="admin@exemplo.com"
+              placeholder="adm@gymplay.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
