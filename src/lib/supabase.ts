@@ -1,10 +1,275 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://prlhdjpzflgjtlmknhps.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'mock-anon-key';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL or Anon Key is missing from the environment variables.');
+// Instância real do Supabase
+const realSupabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Utilitários para persistência local dos dados mockados
+const getMockData = (key: string, initial: any) => {
+  try {
+    const val = localStorage.getItem(key);
+    if (val) return JSON.parse(val);
+  } catch {}
+  return initial;
+};
+
+const saveMockData = (key: string, val: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {}
+};
+
+// Tabelas mock iniciais
+const initialTerminals = [
+  { id: 't1', org_id: '00000000-0000-0000-0000-000000000001', name: 'TV Recepção', location: 'Entrada Principal', status: 'online', is_active: true, last_sync_at: new Date().toISOString() },
+  { id: 't2', org_id: '00000000-0000-0000-0000-000000000001', name: 'TV Musculação 1', location: 'Área de Peso Livre', status: 'online', is_active: true, last_sync_at: new Date().toISOString() },
+  { id: 't3', org_id: '00000000-0000-0000-0000-000000000001', name: 'TV Cardio', location: 'Área de Esteiras', status: 'offline', is_active: true, last_sync_at: null }
+];
+
+const initialMediaFiles = [
+  { id: 'm1', org_id: '00000000-0000-0000-0000-000000000001', name: 'Video Promocional Gym.mp4', file_path: 'mock/promo.mp4', file_type: 'video/mp4', file_size: 15420300, duration_seconds: 30, checksum: 'sum1', created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString() },
+  { id: 'm2', org_id: '00000000-0000-0000-0000-000000000001', name: 'Horário de Funcionamento.png', file_path: 'mock/horario.png', file_type: 'image/png', file_size: 2048500, duration_seconds: null, checksum: 'sum2', created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString() },
+  { id: 'm3', org_id: '00000000-0000-0000-0000-000000000001', name: 'Dica do Nutri - Hidratação.mp4', file_path: 'mock/nutri.mp4', file_type: 'video/mp4', file_size: 25400100, duration_seconds: 15, checksum: 'sum3', created_at: new Date(Date.now() - 12 * 3600 * 1000).toISOString() }
+];
+
+const initialPlaylists = [
+  {
+    id: 'p1',
+    terminal_id: 't1',
+    name: 'Playlist Recepção',
+    is_active: true,
+    version: 1,
+    created_at: new Date().toISOString(),
+    terminals: { name: 'TV Recepção' },
+    playlist_items: [
+      { media_id: 'm1', order: 1 },
+      { media_id: 'm2', order: 2 }
+    ]
+  },
+  {
+    id: 'p2',
+    terminal_id: 't2',
+    name: 'Playlist Musculação',
+    is_active: true,
+    version: 3,
+    created_at: new Date().toISOString(),
+    terminals: { name: 'TV Musculação 1' },
+    playlist_items: [
+      { media_id: 'm1', order: 1 },
+      { media_id: 'm3', order: 2 }
+    ]
+  }
+];
+
+class MockBuilder {
+  private filterField: string | null = null;
+  private filterValue: any = null;
+  private inField: string | null = null;
+  private inValues: any[] | null = null;
+
+  constructor(private table: string) {}
+
+  private getTableData() {
+    if (this.table === 'users') {
+      return [{ id: '00000000-0000-0000-0000-000000000000', org_id: '00000000-0000-0000-0000-000000000001', email: 'adm@gymplay.com', name: 'Administrador Local', role: 'admin' }];
+    }
+    if (this.table === 'terminals') return getMockData('@mock_terminals', initialTerminals);
+    if (this.table === 'media_files') return getMockData('@mock_media_files', initialMediaFiles);
+    if (this.table === 'playlists') return getMockData('@mock_playlists', initialPlaylists);
+    if (this.table === 'playback_stats') {
+      return [
+        { id: 's1', media_id: 'm1', total_plays: 154, media: { name: 'Video Promocional Gym.mp4' } },
+        { id: 's2', media_id: 'm2', total_plays: 98, media: { name: 'Horário de Funcionamento.png' } },
+        { id: 's3', media_id: 'm3', total_plays: 87, media: { name: 'Dica do Nutri - Hidratação.mp4' } }
+      ];
+    }
+    return [];
+  }
+
+  private saveTableData(data: any[]) {
+    if (this.table === 'terminals') saveMockData('@mock_terminals', data);
+    if (this.table === 'media_files') saveMockData('@mock_media_files', data);
+    if (this.table === 'playlists') saveMockData('@mock_playlists', data);
+  }
+
+  select(fields?: string, options?: any) {
+    if (this.table === 'terminal_logs' && options && options.count === 'exact') {
+      // Simular contagem de exibições
+      const countPromise = Promise.resolve({ data: null, count: 339, error: null });
+      return Object.assign(countPromise, this);
+    }
+    return this;
+  }
+
+  eq(field: string, value: any) {
+    this.filterField = field;
+    this.filterValue = value;
+    return this;
+  }
+
+  in(field: string, values: any[]) {
+    this.inField = field;
+    this.inValues = values;
+    return this;
+  }
+
+  order(field: string, opts?: any) {
+    return this;
+  }
+
+  limit(n: number) {
+    return this;
+  }
+
+  async single() {
+    let list = this.getTableData();
+    if (this.filterField) {
+      list = list.filter((item: any) => item[this.filterField!] === this.filterValue);
+    }
+    return { data: list[0] || null, error: list[0] ? null : { message: 'Not found', code: 'PGRST116' } };
+  }
+
+  async insert(items: any | any[]) {
+    const list = this.getTableData();
+    const toInsert = Array.isArray(items) ? items : [items];
+    const newItems = toInsert.map((item: any) => ({
+      id: Math.random().toString(36).substring(2, 15),
+      created_at: new Date().toISOString(),
+      ...item
+    }));
+    
+    // Tratamento especial para playlist_items para vincular com a tabela playlists mockada
+    if (this.table === 'playlist_items') {
+      const playlists = getMockData('@mock_playlists', initialPlaylists);
+      const playlistId = newItems[0].playlist_id;
+      const targetP = playlists.find((p: any) => p.id === playlistId);
+      if (targetP) {
+        if (!targetP.playlist_items) targetP.playlist_items = [];
+        newItems.forEach((ni: any) => {
+          targetP.playlist_items.push({
+            media_id: ni.media_id,
+            order: ni.order
+          });
+        });
+        saveMockData('@mock_playlists', playlists);
+      }
+    } else {
+      list.push(...newItems);
+      this.saveTableData(list);
+    }
+
+    return { data: newItems, error: null };
+  }
+
+  async update(fields: any) {
+    let list = this.getTableData();
+    let updated: any[] = [];
+    list = list.map((item: any) => {
+      if (this.filterField && item[this.filterField!] === this.filterValue) {
+        const uItem = { ...item, ...fields };
+        updated.push(uItem);
+        return uItem;
+      }
+      return item;
+    });
+    this.saveTableData(list);
+    return { data: updated, error: null };
+  }
+
+  async delete() {
+    let list = this.getTableData();
+    if (this.filterField) {
+      list = list.filter((item: any) => item[this.filterField!] !== this.filterValue);
+    }
+    this.saveTableData(list);
+    return { data: [], error: null };
+  }
+
+  // Suporte a Promises no MockBuilder
+  then(onfulfilled?: any, onrejected?: any) {
+    let list = this.getTableData();
+    if (this.filterField) {
+      list = list.filter((item: any) => item[this.filterField!] === this.filterValue);
+    }
+    if (this.inField && this.inValues) {
+      list = list.filter((item: any) => this.inValues!.includes(item[this.inField!]));
+    }
+    return Promise.resolve({ data: list, error: null }).then(onfulfilled, onrejected);
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Exportação do wrapper do cliente Supabase
+export const supabase = {
+  auth: {
+    getSession: () => realSupabase.auth.getSession(),
+    signInWithPassword: (credentials: any) => realSupabase.auth.signInWithPassword(credentials),
+    signOut: () => realSupabase.auth.signOut(),
+    onAuthStateChange: (callback: any) => realSupabase.auth.onAuthStateChange(callback),
+  },
+  
+  from(table: string) {
+    if (localStorage.getItem('@is_mock_session') === 'true') {
+      return new MockBuilder(table) as any;
+    }
+    return realSupabase.from(table);
+  },
+
+  storage: {
+    from(bucket: string) {
+      if (localStorage.getItem('@is_mock_session') === 'true') {
+        return {
+          getPublicUrl: (filePath: string) => {
+            if (filePath.startsWith('mock/')) {
+              if (filePath.includes('promo')) return { data: { publicUrl: 'https://assets.mixkit.co/videos/preview/mixkit-gym-member-doing-barbell-squats-41589-large.mp4' } };
+              if (filePath.includes('horario')) return { data: { publicUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop' } };
+              if (filePath.includes('nutri')) return { data: { publicUrl: 'https://assets.mixkit.co/videos/preview/mixkit-athlete-drinking-water-from-his-bottle-41584-large.mp4' } };
+            }
+            return { data: { publicUrl: 'https://assets.mixkit.co/videos/preview/mixkit-gym-member-doing-barbell-squats-41589-large.mp4' } };
+          },
+          upload: async (filePath: string, file: File) => {
+            const media = getMockData('@mock_media_files', initialMediaFiles);
+            media.push({
+              id: Math.random().toString(36).substring(2, 15),
+              org_id: '00000000-0000-0000-0000-000000000001',
+              name: file.name,
+              file_path: filePath,
+              file_type: file.type,
+              file_size: file.size,
+              duration_seconds: file.type.startsWith('video/') ? 15 : null,
+              checksum: 'mock-sum',
+              created_at: new Date().toISOString()
+            });
+            saveMockData('@mock_media_files', media);
+            return { data: {}, error: null };
+          },
+          remove: async (paths: string[]) => {
+            let media = getMockData('@mock_media_files', initialMediaFiles);
+            media = media.filter((m: any) => !paths.includes(m.file_path));
+            saveMockData('@mock_media_files', media);
+            return { data: {}, error: null };
+          }
+        } as any;
+      }
+      return realSupabase.storage.from(bucket);
+    }
+  },
+
+  channel(name: string) {
+    if (localStorage.getItem('@is_mock_session') === 'true') {
+      return {
+        on: function() { return this; },
+        subscribe: () => ({})
+      } as any;
+    }
+    return realSupabase.channel(name);
+  },
+
+  removeChannel(subscription: any) {
+    if (localStorage.getItem('@is_mock_session') === 'true') return;
+    realSupabase.removeChannel(subscription);
+  }
+} as any;
+
+export default supabase;
