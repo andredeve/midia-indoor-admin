@@ -76,10 +76,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error(e);
     }
 
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      set({ user: session?.user || null, loading: false });
-    });
+    // Check active session with a 1000ms timeout to prevent hanging when offline
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => 
+      setTimeout(() => resolve({ data: { session: null } }), 1000)
+    );
+
+    Promise.race([sessionPromise, timeoutPromise])
+      .then(({ data: { session } }) => {
+        set({ user: session?.user || null, loading: false });
+      })
+      .catch(() => {
+        set({ user: null, loading: false });
+      });
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange((_event, session) => {
