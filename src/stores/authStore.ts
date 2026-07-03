@@ -30,54 +30,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { error: null };
       }
 
-      // 2. Se falhar ou der erro de rede, tenta o bypass de desenvolvimento
-      const normalizedEmail = email.trim().toLowerCase();
-      const isAdmBypass = normalizedEmail === 'adm@gymplay.com' && password === '96761571';
-
-      if (isAdmBypass) {
-        const mockUser = {
-          id: '00000000-0000-0000-0000-000000000000',
-          email: normalizedEmail,
-          user_metadata: {
-            name: 'Administrador Local (Offline)',
-            role: 'admin',
-          }
-        } as any;
-        try {
-          localStorage.setItem('@is_mock_session', 'true');
-          localStorage.setItem('@mock_email', normalizedEmail);
-        } catch (e) {
-          console.error(e);
-        }
-        set({ user: mockUser });
-        return { error: null };
-      }
-
       return { error: error?.message || 'Credenciais inválidas. Tente novamente.' };
     } catch (err: any) {
-      // Se offline ou erro de conexão, e for o login mock
-      const normalizedEmail = email.trim().toLowerCase();
-      const isAdmBypass = normalizedEmail === 'adm@gymplay.com' && password === '96761571';
-
-      if (isAdmBypass) {
-        const mockUser = {
-          id: '00000000-0000-0000-0000-000000000000',
-          email: normalizedEmail,
-          user_metadata: {
-            name: 'Administrador Local (Offline)',
-            role: 'admin',
-          }
-        } as any;
-        try {
-          localStorage.setItem('@is_mock_session', 'true');
-          localStorage.setItem('@mock_email', normalizedEmail);
-        } catch (e) {
-          console.error(e);
-        }
-        set({ user: mockUser });
-        return { error: null };
-      }
-      return { error: err.message };
+      return { error: err.message || 'Erro ao conectar ao servidor.' };
     }
   },
   signOut: async () => {
