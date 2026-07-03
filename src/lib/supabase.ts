@@ -73,7 +73,8 @@ class MockBuilder {
 
   private getTableData() {
     if (this.table === 'users') {
-      return [{ id: '00000000-0000-0000-0000-000000000000', org_id: '00000000-0000-0000-0000-000000000001', email: 'adm@gymplay.com', name: 'Administrador Local', role: 'admin' }];
+      const mockEmail = localStorage.getItem('@mock_email') || 'adm@gymplay.com';
+      return [{ id: '00000000-0000-0000-0000-000000000000', org_id: '00000000-0000-0000-0000-000000000001', email: mockEmail, name: 'Administrador Local', role: 'admin' }];
     }
     if (this.table === 'terminals') return getMockData('@mock_terminals', initialTerminals);
     if (this.table === 'media_files') return getMockData('@mock_media_files', initialMediaFiles);
