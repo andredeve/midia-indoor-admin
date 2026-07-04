@@ -11,13 +11,13 @@ export default function Layout() {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <div className="app-container">
+    <div className="app">
       {/* Overlay */}
       <div className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={closeSidebar}></div>
       
       {/* Sidebar */}
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header" style={{ padding: '1.5rem', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <div className="sidebar-header">
           <img 
             src="/logo.png" 
             alt="GYM PLAY Mídia" 
@@ -28,35 +28,35 @@ export default function Layout() {
               objectFit: 'contain'
             }} 
           />
-          <button className="sidebar-close" onClick={closeSidebar}>
+          <button className="btn btn-icon" onClick={closeSidebar} aria-label="Close sidebar">
             <X size={24} />
           </button>
         </div>
         
-        <nav className="sidebar-nav">
-          <NavLink to="/" className={({isActive}) => isActive ? 'nav-item active' : 'nav-item'} end onClick={closeSidebar}>
+        <nav className="nav flex-col">
+          <NavLink to="/" className={({isActive}) => isActive ? 'nav-link active' : 'nav-link'} end onClick={closeSidebar}>
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
           </NavLink>
           
-          <NavLink to="/terminals" className={({isActive}) => isActive ? 'nav-item active' : 'nav-item'} onClick={closeSidebar}>
+          <NavLink to="/terminals" className={({isActive}) => isActive ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <MonitorPlay size={20} />
             <span>Terminais (TVs)</span>
           </NavLink>
           
-          <NavLink to="/media" className={({isActive}) => isActive ? 'nav-item active' : 'nav-item'} onClick={closeSidebar}>
+          <NavLink to="/media" className={({isActive}) => isActive ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <ImageIcon size={20} />
             <span>Biblioteca de Mídias</span>
           </NavLink>
           
-          <NavLink to="/playlists" className={({isActive}) => isActive ? 'nav-item active' : 'nav-item'} onClick={closeSidebar}>
+          <NavLink to="/playlists" className={({isActive}) => isActive ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <ListVideo size={20} />
             <span>Playlists</span>
           </NavLink>
         </nav>
         
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--panel-border)' }}>
-          <button onClick={signOut} className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }}>
+        <div className="sidebar-footer">
+          <button onClick={signOut} className="btn btn-outline btn-full">
             <LogOut size={18} />
             <span>Sair</span>
           </button>
@@ -66,16 +66,16 @@ export default function Layout() {
       {/* Main Content */}
       <main className="main-content">
         <header className="topbar">
-          <button className="menu-toggle" onClick={toggleSidebar}>
+          <button className="btn btn-icon menu-toggle" onClick={toggleSidebar} aria-label="Toggle menu">
             <Menu size={24} />
           </button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }} className="user-info">
-              <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{user?.user_metadata?.name || 'Administrador'}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.email}</div>
+          <div className="flex items-center gap-4">
+            <div className="user-info text-right">
+              <div className="text-sm font-medium">{user?.user_metadata?.name || 'Administrador'}</div>
+              <div className="text-xs text-muted">{user?.email}</div>
             </div>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#000', fontSize: '0.875rem' }}>
+            <div className="avatar bg-primary text-dark">
               {user?.user_metadata?.name?.charAt(0) || 'A'}
             </div>
           </div>
