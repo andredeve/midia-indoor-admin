@@ -34,26 +34,20 @@ export default function Login() {
 
   return (
     <div className="auth-container">
-      <div className="auth-card" style={{ backgroundColor: '#000000', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <img 
-            src="/logo.png" 
-            alt="GYM PLAY Mídia" 
-            style={{ 
-              width: '200px', 
-              height: 'auto'
-            }} 
-          />
+      <div className="auth-card">
+        <div className="auth-logo-wrap">
+          <img src="/logo.png" alt="GYM PLAY Mídia" style={{ height: '42px', width: 'auto' }} />
         </div>
+        <h1 className="auth-title">Bem-vindo de volta</h1>
         <p className="auth-subtitle">Painel Administrativo</p>
         
         {error && (
-          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.875rem' }}>
+          <div className="alert-error">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="input-group">
             <label className="input-label" htmlFor="email">E-mail</label>
             <input 
@@ -80,7 +74,7 @@ export default function Login() {
             />
           </div>
           
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', padding: '0.75rem' }} disabled={loading}>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '4px', padding: '10px' }} disabled={loading}>
             {loading ? <div className="loader"></div> : (
               <>
                 <LogIn size={18} />

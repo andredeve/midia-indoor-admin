@@ -350,6 +350,15 @@ button { font-family: inherit; }
 
 .card-sm { border-radius: var(--r-md); }
 
+/* Legacy alias — maps old class to new surface */
+.glass-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  transition: border-color var(--dur-mid) ease;
+}
+.glass-panel:hover { border-color: var(--border-default); }
+
 /* ================================================================
    STAT CARDS
    ================================================================ */
@@ -540,8 +549,17 @@ button { font-family: inherit; }
   border-color: transparent;
 }
 
-/* Outline (compat alias) */
-.btn-outline { composes: btn-ghost from global; }
+/* Outline (alias for ghost) */
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+.btn-outline:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
 
 /* Icon button */
 .icon-btn {
