@@ -213,7 +213,7 @@ export default function Terminals() {
       {/* Modal de Formulário */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="glass-panel modal-content" style={{ width: '400px' }}>
+          <div className="glass-panel modal-content" style={{ width: '100%', maxWidth: '460px', padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
                 {editingTerminal ? 'Editar Terminal' : 'Novo Terminal'}
@@ -224,67 +224,106 @@ export default function Terminals() {
             </div>
 
             <form onSubmit={handleSave}>
-              <div className="form-group">
-                <label className="form-label">Nome do Terminal</label>
+              <div className="input-group">
+                <label className="input-label">Nome do Terminal</label>
                 <input 
                   type="text" 
-                  className="form-input" 
+                  className="input-field" 
                   placeholder="Ex: Recepção, Corredor..."
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
-              <div className="form-group" style={{ marginTop: '1rem' }}>
-                <label className="form-label">Localização / Unidade</label>
+              <div className="input-group" style={{ marginTop: '1rem' }}>
+                <label className="input-label">Localização / Unidade</label>
                 <input 
                   type="text" 
-                  className="form-input" 
+                  className="input-field" 
                   placeholder="Ex: Unidade Centro, Andar 2..."
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 />
               </div>
 
-              <div className="form-group" style={{ marginTop: '1.25rem', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
-                <input 
-                  type="checkbox" 
-                  id="show_info_bar"
-                  checked={formData.show_info_bar}
-                  onChange={(e) => setFormData({ ...formData, show_info_bar: e.target.checked })}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <label htmlFor="show_info_bar" className="form-label" style={{ marginBottom: 0, cursor: 'pointer' }}>Exibir Barra de Informações na TV</label>
+              {/* Custom Switch Toggle */}
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '0.85rem 1rem', 
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)', 
+                  borderRadius: 'var(--border-radius)', 
+                  border: '1px solid var(--panel-border)', 
+                  marginTop: '1.5rem', 
+                  cursor: 'pointer',
+                  userSelect: 'none'
+                }} 
+                onClick={() => setFormData({ ...formData, show_info_bar: !formData.show_info_bar })}
+              >
+                <div>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>Exibir Barra de Informações</span>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Exibe clima, relógio e anúncio na TV</p>
+                </div>
+                <div style={{
+                  width: '42px',
+                  height: '24px',
+                  borderRadius: '12px',
+                  backgroundColor: formData.show_info_bar ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.1)',
+                  padding: '2px',
+                  position: 'relative',
+                  transition: 'background-color 0.2s ease-in-out'
+                }}>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    backgroundColor: formData.show_info_bar ? '#000000' : '#ffffff',
+                    position: 'absolute',
+                    left: formData.show_info_bar ? '20px' : '2px',
+                    transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s'
+                  }} />
+                </div>
               </div>
 
               {formData.show_info_bar && (
-                <>
-                  <div className="form-group" style={{ marginTop: '1rem' }}>
-                    <label className="form-label">Nome do Estabelecimento</label>
+                <div style={{
+                  borderLeft: '2px solid var(--primary-color)',
+                  paddingLeft: '1rem',
+                  marginLeft: '0.25rem',
+                  marginTop: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  animation: 'fadeInSlide 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}>
+                  <div className="input-group" style={{ margin: 0 }}>
+                    <label className="input-label">Nome do Estabelecimento</label>
                     <input 
                       type="text" 
-                      className="form-input" 
+                      className="input-field" 
                       placeholder="Ex: Academia GymPlay Centro"
                       value={formData.establishment_name}
                       onChange={(e) => setFormData({ ...formData, establishment_name: e.target.value })}
                     />
                   </div>
 
-                  <div className="form-group" style={{ marginTop: '1rem' }}>
-                    <label className="form-label">Texto do Anúncio (Letreiro)</label>
+                  <div className="input-group" style={{ margin: 0 }}>
+                    <label className="input-label">Texto do Anúncio (Letreiro)</label>
                     <input 
                       type="text" 
-                      className="form-input" 
+                      className="input-field" 
                       placeholder="Ex: Fale conosco pelo telefone: (11) 99676-1571..."
                       value={formData.advertisement_text}
                       onChange={(e) => setFormData({ ...formData, advertisement_text: e.target.value })}
                     />
                   </div>
-                </>
+                </div>
               )}
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSaving}>
@@ -312,11 +351,15 @@ export default function Terminals() {
           padding: 1rem;
         }
         .modal-content {
-          animation: modalAppear 0.3s ease-out;
+          animation: modalAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         @keyframes modalAppear {
-          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          from { opacity: 0; transform: scale(0.96) translateY(12px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes fadeInSlide {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .icon-btn {
           background: rgba(255, 255, 255, 0.05);
@@ -337,11 +380,6 @@ export default function Terminals() {
         .icon-btn.text-danger:hover {
           background: rgba(239, 68, 68, 0.1);
           color: var(--danger-color);
-        }
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
         }
       `}</style>
     </div>
