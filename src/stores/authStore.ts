@@ -80,7 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
     // Listen for auth changes
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((_event: any, session: any) => {
       // Se tiver mock ativo, ignorar mudança silenciosa do supabase auth
       try {
         if (localStorage.getItem('@is_mock_session') === 'true') return;

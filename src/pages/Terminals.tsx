@@ -13,6 +13,7 @@ interface Terminal {
   is_active: boolean;
   last_sync_at: string | null;
   org_id: string;
+  device_info?: any;
 }
 
 export default function Terminals() {

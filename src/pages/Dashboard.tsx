@@ -34,9 +34,9 @@ export default function Dashboard() {
         const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
         setStats({
           total: terminals.length,
-          online: terminals.filter(t => t.status === 'online').length,
+          online: terminals.filter((t: any) => t.status === 'online').length,
           totalPlays: totalPlays || 0,
-          activeNow: terminals.filter(t => t.last_seen_at && new Date(t.last_seen_at) > threeMinutesAgo).length
+          activeNow: terminals.filter((t: any) => t.last_seen_at && new Date(t.last_seen_at) > threeMinutesAgo).length
         });
       }
 

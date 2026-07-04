@@ -68,8 +68,11 @@ class MockBuilder {
   private filterValue: any = null;
   private inField: string | null = null;
   private inValues: any[] | null = null;
+  private table: string;
 
-  constructor(private table: string) {}
+  constructor(table: string) {
+    this.table = table;
+  }
 
   private getTableData() {
     if (this.table === 'users') {
@@ -95,7 +98,7 @@ class MockBuilder {
     if (this.table === 'playlists') saveMockData('@mock_playlists', data);
   }
 
-  select(fields?: string, options?: any) {
+  select(_fields?: string, options?: any) {
     if (this.table === 'terminal_logs' && options && options.count === 'exact') {
       // Simular contagem de exibições
       const countPromise = Promise.resolve({ data: null, count: 339, error: null });
@@ -116,11 +119,11 @@ class MockBuilder {
     return this;
   }
 
-  order(field: string, opts?: any) {
+  order(_field: string, _opts?: any) {
     return this;
   }
 
-  limit(n: number) {
+  limit(_n: number) {
     return this;
   }
 

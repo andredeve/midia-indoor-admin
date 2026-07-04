@@ -32,7 +32,7 @@ export default function MediaLibrary() {
         .order('created_at', { ascending: false });
         
       if (data && !error) {
-        const mediaWithUrls = data.map(item => {
+        const mediaWithUrls = data.map((item: any) => {
           const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(item.file_path);
           return { ...item, publicUrl: publicUrlData.publicUrl };
         });

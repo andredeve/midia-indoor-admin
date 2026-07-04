@@ -29,7 +29,7 @@ export default function Playlists() {
       
       let pData: any[] = [];
       if (tData && tData.length > 0) {
-        const terminalIds = tData.map(t => t.id);
+        const terminalIds = tData.map((t: any) => t.id);
         const { data } = await supabase
           .from('playlists')
           .select('*, terminals(name), playlist_items(media_id, order)')
