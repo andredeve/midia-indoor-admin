@@ -20,7 +20,13 @@ export default function Terminals() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState<Terminal | null>(null);
-  const [formData, setFormData] = useState({ name: '', location: '' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    location: '',
+    show_info_bar: true,
+    establishment_name: '',
+    advertisement_text: ''
+  });
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuthStore();
 
@@ -60,10 +66,23 @@ export default function Terminals() {
   const handleOpenModal = (terminal?: Terminal) => {
     if (terminal) {
       setEditingTerminal(terminal);
-      setFormData({ name: terminal.name, location: terminal.location || '' });
+      const devInfo = terminal.device_info || {};
+      setFormData({ 
+        name: terminal.name, 
+        location: terminal.location || '',
+        show_info_bar: devInfo.show_info_bar !== false,
+        establishment_name: devInfo.establishment_name || '',
+        advertisement_text: devInfo.advertisement_text || ''
+      });
     } else {
       setEditingTerminal(null);
-      setFormData({ name: '', location: '' });
+      setFormData({ 
+        name: '', 
+        location: '',
+        show_info_bar: true,
+        establishment_name: '',
+        advertisement_text: ''
+      });
     }
     setIsModalOpen(true);
   };
@@ -77,11 +96,19 @@ export default function Terminals() {
       
       if (!userData?.org_id) throw new Error('Organização não encontrada');
 
+      const updatedDeviceInfo = editingTerminal 
+        ? { ...(editingTerminal.device_info || {}), show_info_bar: formData.show_info_bar, establishment_name: formData.establishment_name, advertisement_text: formData.advertisement_text }
+        : { show_info_bar: formData.show_info_bar, establishment_name: formData.establishment_name, advertisement_text: formData.advertisement_text };
+
       if (editingTerminal) {
         // Update
         const { error } = await supabase
           .from('terminals')
-          .update({ name: formData.name, location: formData.location })
+          .update({ 
+            name: formData.name, 
+            location: formData.location,
+            device_info: updatedDeviceInfo
+          })
           .eq('id', editingTerminal.id);
         if (error) throw error;
       } else {
@@ -93,7 +120,8 @@ export default function Terminals() {
             location: formData.location, 
             org_id: userData.org_id,
             status: 'offline',
-            is_active: true
+            is_active: true,
+            device_info: updatedDeviceInfo
           }]);
         if (error) throw error;
       }
@@ -216,6 +244,43 @@ export default function Terminals() {
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 />
               </div>
+
+              <div className="form-group" style={{ marginTop: '1.25rem', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                <input 
+                  type="checkbox" 
+                  id="show_info_bar"
+                  checked={formData.show_info_bar}
+                  onChange={(e) => setFormData({ ...formData, show_info_bar: e.target.checked })}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="show_info_bar" className="form-label" style={{ marginBottom: 0, cursor: 'pointer' }}>Exibir Barra de Informações na TV</label>
+              </div>
+
+              {formData.show_info_bar && (
+                <>
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label className="form-label">Nome do Estabelecimento</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Ex: Academia GymPlay Centro"
+                      value={formData.establishment_name}
+                      onChange={(e) => setFormData({ ...formData, establishment_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label className="form-label">Texto do Anúncio (Letreiro)</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Ex: Fale conosco pelo telefone: (11) 99676-1571..."
+                      value={formData.advertisement_text}
+                      onChange={(e) => setFormData({ ...formData, advertisement_text: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                 <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setIsModalOpen(false)}>
