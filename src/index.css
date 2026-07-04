@@ -112,7 +112,7 @@ button { font-family: inherit; }
    ================================================================ */
 .sidebar {
   width: var(--sidebar-w);
-  background-color: var(--bg-surface);
+  background-color: #000000;
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
@@ -124,10 +124,10 @@ button { font-family: inherit; }
 .sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: var(--topbar-h);
+  justify-content: center;
+  padding: 20px 16px;
   border-bottom: 1px solid var(--border-subtle);
+  position: relative;
 }
 
 .sidebar-logo {
@@ -137,7 +137,7 @@ button { font-family: inherit; }
 }
 
 .sidebar-logo img {
-  height: 28px;
+  height: 44px;
   width: auto;
   object-fit: contain;
 }
@@ -230,7 +230,7 @@ button { font-family: inherit; }
    ================================================================ */
 .topbar {
   height: var(--topbar-h);
-  background-color: var(--bg-surface);
+  background-color: #000000;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -969,6 +969,10 @@ button { font-family: inherit; }
   padding: 6px;
   border-radius: var(--r-sm);
   transition: all var(--dur-fast);
+}
+.sidebar-close {
+  position: absolute;
+  right: 16px;
 }
 .menu-toggle:hover, .sidebar-close:hover {
   background: var(--bg-hover);
