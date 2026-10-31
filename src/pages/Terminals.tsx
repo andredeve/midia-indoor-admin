@@ -1,7 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { MonitorPlay, Clock, Edit2, Trash2, X, Plus } from 'lucide-react';
+import {
+  MonitorPlay,
+  Clock,
+  Edit2,
+  Trash2,
+  X,
+  Plus,
+  RefreshCw,
+  Search,
+  Wifi,
+  WifiOff,
+  Link2,
+  Unlink,
+  Building2
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,17 +27,35 @@ interface Terminal {
   is_active: boolean;
   last_sync_at: string | null;
   org_id: string;
+  partner_id?: string | null;
+  partners?: {
+    establishment_name?: string;
+    users?: {
+      email?: string;
+    };
+  };
   device_info?: any;
+}
+
+interface PartnerOption {
+  id: string;
+  establishment_name?: string;
+  users?: { email?: string };
 }
 
 export default function Terminals() {
   const [terminals, setTerminals] = useState<Terminal[]>([]);
+  const [partners, setPartners] = useState<PartnerOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState<Terminal | null>(null);
-  const [formData, setFormData] = useState({ 
-    name: '', 
+  const [formData, setFormData] = useState({
+    name: '',
     location: '',
+    partner_id: '',
     show_info_bar: true,
     establishment_name: '',
     advertisement_text: ''
@@ -33,17 +65,30 @@ export default function Terminals() {
 
   const loadTerminals = async () => {
     setLoading(true);
-    const { data: userData } = await supabase.from('users').select('org_id').eq('id', user?.id).single();
-    
+    const { data: userData } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user?.id)
+      .single();
+
     if (userData?.org_id) {
-      const { data, error } = await supabase
-        .from('terminals')
-        .select('*')
-        .eq('org_id', userData.org_id)
-        .order('created_at', { ascending: false });
-        
-      if (data && !error) {
-        setTerminals(data);
+      const [termRes, partRes] = await Promise.all([
+        supabase
+          .from('terminals')
+          .select('*, partners(establishment_name, users(email))')
+          .eq('org_id', userData.org_id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('partners')
+          .select('id, establishment_name, users(email)')
+          .order('establishment_name', { ascending: true })
+      ]);
+
+      if (termRes.data && !termRes.error) {
+        setTerminals(termRes.data as Terminal[]);
+      }
+      if (partRes.data) {
+        setPartners(partRes.data as PartnerOption[]);
       }
     }
     setLoading(false);
@@ -64,22 +109,47 @@ export default function Terminals() {
     };
   }, [user]);
 
+  const stats = useMemo(() => {
+    const total = terminals.length;
+    const online = terminals.filter((t) => t.status === 'online').length;
+    const offline = total - online;
+    const pinned = terminals.filter((t) => Boolean(t.device_info?.pinned_at)).length;
+    return { total, online, offline, pinned };
+  }, [terminals]);
+
+  const filteredTerminals = useMemo(() => {
+    return terminals.filter((t) => {
+      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      const partnerName =
+        t.partners?.establishment_name || t.partners?.users?.email || '';
+      return (
+        t.name?.toLowerCase().includes(q) ||
+        t.location?.toLowerCase().includes(q) ||
+        partnerName.toLowerCase().includes(q)
+      );
+    });
+  }, [terminals, statusFilter, searchQuery]);
+
   const handleOpenModal = (terminal?: Terminal) => {
     if (terminal) {
       setEditingTerminal(terminal);
       const devInfo = terminal.device_info || {};
-      setFormData({ 
-        name: terminal.name, 
+      setFormData({
+        name: terminal.name,
         location: terminal.location || '',
+        partner_id: terminal.partner_id || '',
         show_info_bar: devInfo.show_info_bar !== false,
         establishment_name: devInfo.establishment_name || '',
         advertisement_text: devInfo.advertisement_text || ''
       });
     } else {
       setEditingTerminal(null);
-      setFormData({ 
-        name: '', 
+      setFormData({
+        name: '',
         location: '',
+        partner_id: '',
         show_info_bar: true,
         establishment_name: '',
         advertisement_text: ''
@@ -88,42 +158,55 @@ export default function Terminals() {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
     try {
-      const { data: userData } = await supabase.from('users').select('org_id').eq('id', user?.id).single();
-      
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user?.id)
+        .single();
+
       if (!userData?.org_id) throw new Error('Organização não encontrada');
 
-      const updatedDeviceInfo = editingTerminal 
-        ? { ...(editingTerminal.device_info || {}), show_info_bar: formData.show_info_bar, establishment_name: formData.establishment_name, advertisement_text: formData.advertisement_text }
-        : { show_info_bar: formData.show_info_bar, establishment_name: formData.establishment_name, advertisement_text: formData.advertisement_text };
+      const updatedDeviceInfo = editingTerminal
+        ? {
+            ...(editingTerminal.device_info || {}),
+            show_info_bar: formData.show_info_bar,
+            establishment_name: formData.establishment_name,
+            advertisement_text: formData.advertisement_text
+          }
+        : {
+            show_info_bar: formData.show_info_bar,
+            establishment_name: formData.establishment_name,
+            advertisement_text: formData.advertisement_text
+          };
 
       if (editingTerminal) {
-        // Update
         const { error } = await supabase
           .from('terminals')
-          .update({ 
-            name: formData.name, 
+          .update({
+            name: formData.name,
             location: formData.location,
+            partner_id: formData.partner_id || null,
             device_info: updatedDeviceInfo
           })
           .eq('id', editingTerminal.id);
         if (error) throw error;
       } else {
-        // Create
-        const { error } = await supabase
-          .from('terminals')
-          .insert([{ 
-            name: formData.name, 
-            location: formData.location, 
+        const { error } = await supabase.from('terminals').insert([
+          {
+            name: formData.name,
+            location: formData.location,
             org_id: userData.org_id,
+            partner_id: formData.partner_id || null,
             status: 'offline',
             is_active: true,
             device_info: updatedDeviceInfo
-          }]);
+          }
+        ]);
         if (error) throw error;
       }
 
@@ -147,241 +230,555 @@ export default function Terminals() {
     }
   };
 
+  const handleUnlink = async (terminal: Terminal) => {
+    if (
+      !confirm(
+        `Tem certeza que deseja desvincular o dispositivo de "${terminal.name}"? O app voltará para a tela inicial.`
+      )
+    )
+      return;
+
+    const currentDeviceInfo = terminal.device_info || {};
+
+    const { error } = await supabase
+      .from('terminals')
+      .update({
+        device_info: {
+          ...currentDeviceInfo,
+          force_unlink: true,
+          pinned_at: null
+        }
+      })
+      .eq('id', terminal.id);
+
+    if (error) {
+      alert('Erro ao desvincular terminal: ' + error.message);
+    } else {
+      loadTerminals();
+    }
+  };
+
+  const handleReboot = async (terminal: Terminal) => {
+    if (
+      !confirm(
+        `Tem certeza que deseja forçar a reinicialização da TV "${terminal.name}"?`
+      )
+    )
+      return;
+
+    const currentDeviceInfo = terminal.device_info || {};
+
+    const { error } = await supabase
+      .from('terminals')
+      .update({
+        device_info: {
+          ...currentDeviceInfo,
+          force_reboot: true
+        }
+      })
+      .eq('id', terminal.id);
+
+    if (error) {
+      alert('Erro ao enviar comando de reinicialização: ' + error.message);
+    } else {
+      try {
+        await supabase.from('terminal_logs').insert({
+          terminal_id: terminal.id,
+          event_type: 'command_reboot',
+          metadata: { timestamp: new Date().toISOString(), action: 'force_reboot' }
+        });
+      } catch (logErr) {
+        console.error('Erro ao registrar log de reinicialização:', logErr);
+      }
+      alert(
+        `Comando de reinicialização enviado para "${terminal.name}". A TV reiniciará na próxima sincronização.`
+      );
+      loadTerminals();
+    }
+  };
+
   return (
     <div>
+      {/* Header */}
       <div className="page-header">
-        <h1 className="page-title">Terminais (TVs)</h1>
-        <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-          <Plus size={18} style={{ marginRight: '8px' }} />
-          Adicionar Terminal
-        </button>
+        <div className="page-title-group">
+          <h1 className="page-title">Terminais</h1>
+          <p className="page-subtitle">
+            Gerencie telas conectadas, status de transmissão, pareamento de hardware e letreiros.
+          </p>
+        </div>
+
+        <div className="page-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={loadTerminals}
+            disabled={loading}
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+            <span>Atualizar</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => handleOpenModal()}
+          >
+            <Plus size={15} strokeWidth={2.2} />
+            <span>Novo Terminal</span>
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-          <div className="loader"></div>
+      {/* KPI Strip */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-label">Total de Telas</span>
+            <span className="kpi-icon">
+              <MonitorPlay size={15} strokeWidth={1.75} />
+            </span>
+          </div>
+          <div className="kpi-value">{loading ? '—' : stats.total}</div>
+          <div className="kpi-meta">Pontos de exibição cadastrados</div>
         </div>
-      ) : terminals.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-muted)' }}>Nenhum terminal cadastrado. Clique em Adicionar Terminal para começar.</p>
+
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-label">Transmitindo (Online)</span>
+            <span className="kpi-icon">
+              <Wifi size={15} strokeWidth={1.75} />
+            </span>
+          </div>
+          <div className="kpi-value" style={{ color: stats.online > 0 ? 'var(--success)' : undefined }}>
+            {loading ? '—' : stats.online}
+          </div>
+          <div className="kpi-meta">Conexão ativa com o servidor</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-label">Desconectados (Offline)</span>
+            <span className="kpi-icon">
+              <WifiOff size={15} strokeWidth={1.75} />
+            </span>
+          </div>
+          <div className="kpi-value">{loading ? '—' : stats.offline}</div>
+          <div className="kpi-meta">Em repouso ou sem sinal</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-label">Dispositivos Pareados</span>
+            <span className="kpi-icon">
+              <Link2 size={15} strokeWidth={1.75} />
+            </span>
+          </div>
+          <div className="kpi-value">{loading ? '—' : stats.pinned}</div>
+          <div className="kpi-meta">Hardware fixado à licença</div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="search-field">
+          <Search size={15} className="search-field-icon" />
+          <input
+            type="text"
+            placeholder="Buscar por nome, setor ou academia..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="search-field-clear"
+              onClick={() => setSearchQuery('')}
+              aria-label="Limpar busca"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        <div className="segmented-control">
+          <button
+            type="button"
+            className={`seg-btn ${statusFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('all')}
+          >
+            Todos <span className="seg-count">{stats.total}</span>
+          </button>
+          <button
+            type="button"
+            className={`seg-btn ${statusFilter === 'online' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('online')}
+          >
+            Online <span className="seg-count">{stats.online}</span>
+          </button>
+          <button
+            type="button"
+            className={`seg-btn ${statusFilter === 'offline' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('offline')}
+          >
+            Offline <span className="seg-count">{stats.offline}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="loading-state">
+          <div className="loader" />
+          <span>Carregando terminais...</span>
+        </div>
+      ) : filteredTerminals.length === 0 ? (
+        <div className="card empty-state">
+          <div className="empty-state-icon">
+            <MonitorPlay size={18} />
+          </div>
+          <div className="empty-state-title">
+            {terminals.length === 0
+              ? 'Nenhum terminal cadastrado'
+              : 'Nenhum terminal encontrado'}
+          </div>
+          <p className="empty-state-desc">
+            {terminals.length === 0
+              ? 'Cadastre o primeiro ponto de transmissão para vincular playlists e monitorar o status em tempo real.'
+              : 'Ajuste os termos de busca ou altere o filtro de conectividade.'}
+          </p>
+          {terminals.length === 0 && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginTop: 8 }}
+              onClick={() => handleOpenModal()}
+            >
+              <Plus size={15} />
+              <span>Novo Terminal</span>
+            </button>
+          )}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          {terminals.map(terminal => (
-            <div key={terminal.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
-                    <MonitorPlay size={20} color="var(--primary-color)" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontWeight: 600 }}>{terminal.name}</h3>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{terminal.location || 'Sem localização'}</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="icon-btn" onClick={() => handleOpenModal(terminal)}>
-                    <Edit2 size={16} />
-                  </button>
-                  <button className="icon-btn text-danger" onClick={() => handleDelete(terminal.id)}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))',
+            gap: 14
+          }}
+        >
+          {filteredTerminals.map((terminal) => {
+            const isOnline = terminal.status === 'online';
+            const isPinned = Boolean(terminal.device_info?.pinned_at);
+            const partnerLabel =
+              terminal.partners?.establishment_name ||
+              terminal.partners?.users?.email;
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: terminal.status === 'online' ? 'var(--success-color)' : 'var(--danger-color)' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: terminal.status === 'online' ? 'var(--success-color)' : 'var(--danger-color)' }}>
-                    {terminal.status === 'online' ? 'Online' : 'Offline'}
+            return (
+              <div
+                key={terminal.id}
+                className="card card-interactive"
+                style={{
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14
+                }}
+              >
+                {/* Top Row */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: 12
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, minWidth: 0 }}>
+                    <div className="entity-avatar">
+                      <MonitorPlay size={15} strokeWidth={1.75} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <h3
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                        title={terminal.name}
+                      >
+                        {terminal.name}
+                      </h3>
+                      <p
+                        className="cell-secondary"
+                        style={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {terminal.location || 'Localização não especificada'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`badge ${isOnline ? 'badge-success' : 'badge-danger'}`}>
+                    <span className={`status-dot ${isOnline ? 'online' : 'offline'}`} />
+                    {isOnline ? 'Online' : 'Offline'}
                   </span>
                 </div>
-                
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={12} />
-                  <span>Sync: {terminal.last_sync_at 
-                    ? formatDistanceToNow(new Date(terminal.last_sync_at), { addSuffix: true, locale: ptBR })
-                    : 'Nunca'}
-                  </span>
+
+                {/* Metadata List */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 7,
+                    padding: '10px 12px',
+                    background: 'var(--bg-surface-sub)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--r-md)',
+                    fontSize: 12
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Building2 size={12} />
+                      Unidade
+                    </span>
+                    <span
+                      style={{
+                        color: partnerLabel ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                        fontWeight: partnerLabel ? 500 : 400,
+                        maxWidth: 180,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {partnerLabel || 'Rede própria'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Link2 size={12} />
+                      Hardware
+                    </span>
+                    <span style={{ color: isPinned ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
+                      {isPinned ? 'Dispositivo vinculado' : 'Sem vínculo ativo'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Clock size={12} />
+                      Sincronização
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                      {terminal.last_sync_at
+                        ? formatDistanceToNow(new Date(terminal.last_sync_at), {
+                            addSuffix: true,
+                            locale: ptBR
+                          })
+                        : 'Nunca'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    paddingTop: 4
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleReboot(terminal)}
+                      title="Forçar reinicialização remota do app"
+                    >
+                      <RefreshCw size={12} />
+                      <span>Reiniciar</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleUnlink(terminal)}
+                      title="Desvincular hardware na próxima sincronização"
+                    >
+                      <Unlink size={12} />
+                      <span>Desvincular</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => handleOpenModal(terminal)}
+                      title="Configurar terminal"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      onClick={() => handleDelete(terminal.id)}
+                      title="Excluir terminal"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Modal de Formulário */}
+      {/* Modal Criar / Editar Terminal */}
       {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="glass-panel modal-content" style={{ width: '100%', maxWidth: '460px', padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                {editingTerminal ? 'Editar Terminal' : 'Novo Terminal'}
-              </h2>
-              <button className="icon-btn" onClick={() => setIsModalOpen(false)}>
-                <X size={20} />
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">
+                  {editingTerminal ? 'Configurar Terminal' : 'Novo Terminal'}
+                </h2>
+                <p className="modal-subtitle">
+                  Defina identificação, vínculo de unidade e parâmetros da barra informativa.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Fechar"
+              >
+                <X size={16} />
               </button>
             </div>
 
             <form onSubmit={handleSave}>
-              <div className="input-group">
-                <label className="input-label">Nome do Terminal</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="Ex: Recepção, Corredor..."
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="input-group" style={{ marginTop: '1rem' }}>
-                <label className="input-label">Localização / Unidade</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="Ex: Unidade Centro, Andar 2..."
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                />
-              </div>
-
-              {/* Custom Switch Toggle */}
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  padding: '0.85rem 1rem', 
-                  backgroundColor: 'rgba(255, 255, 255, 0.02)', 
-                  borderRadius: 'var(--border-radius)', 
-                  border: '1px solid var(--panel-border)', 
-                  marginTop: '1.5rem', 
-                  cursor: 'pointer',
-                  userSelect: 'none'
-                }} 
-                onClick={() => setFormData({ ...formData, show_info_bar: !formData.show_info_bar })}
-              >
-                <div>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>Exibir Barra de Informações</span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Exibe clima, relógio e anúncio na TV</p>
-                </div>
-                <div style={{
-                  width: '42px',
-                  height: '24px',
-                  borderRadius: '12px',
-                  backgroundColor: formData.show_info_bar ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.1)',
-                  padding: '2px',
-                  position: 'relative',
-                  transition: 'background-color 0.2s ease-in-out'
-                }}>
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '10px',
-                    backgroundColor: formData.show_info_bar ? '#000000' : '#ffffff',
-                    position: 'absolute',
-                    left: formData.show_info_bar ? '20px' : '2px',
-                    transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s'
-                  }} />
-                </div>
-              </div>
-
-              {formData.show_info_bar && (
-                <div style={{
-                  borderLeft: '2px solid var(--primary-color)',
-                  paddingLeft: '1rem',
-                  marginLeft: '0.25rem',
-                  marginTop: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  animation: 'fadeInSlide 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}>
-                  <div className="input-group" style={{ margin: 0 }}>
-                    <label className="input-label">Nome do Estabelecimento</label>
-                    <input 
-                      type="text" 
-                      className="input-field" 
-                      placeholder="Ex: Academia GymPlay Centro"
-                      value={formData.establishment_name}
-                      onChange={(e) => setFormData({ ...formData, establishment_name: e.target.value })}
+              <div className="modal-body">
+                <div className="form-grid-2">
+                  <div className="input-group">
+                    <label className="input-label">Nome do Terminal *</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Ex: Recepção Principal"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
                     />
                   </div>
 
-                  <div className="input-group" style={{ margin: 0 }}>
-                    <label className="input-label">Texto do Anúncio (Letreiro)</label>
-                    <input 
-                      type="text" 
-                      className="input-field" 
-                      placeholder="Ex: Fale conosco pelo telefone: (11) 99676-1571..."
-                      value={formData.advertisement_text}
-                      onChange={(e) => setFormData({ ...formData, advertisement_text: e.target.value })}
+                  <div className="input-group">
+                    <label className="input-label">Setor / Localização</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Ex: Área de Musculação - Piso 1"
+                      value={formData.location}
+                      onChange={(e) =>
+                        setFormData({ ...formData, location: e.target.value })
+                      }
                     />
                   </div>
                 </div>
-              )}
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsModalOpen(false)}>
+                <div className="input-group">
+                  <label className="input-label">Estabelecimento Parceiro (Opcional)</label>
+                  <select
+                    className="select-field"
+                    value={formData.partner_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, partner_id: e.target.value })
+                    }
+                  >
+                    <option value="">Rede Própria (Sem vínculo com parceiro)</option>
+                    {partners.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.establishment_name || p.users?.email || p.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Switch Barra de Informações */}
+                <div
+                  className="toggle-row"
+                  onClick={() =>
+                    setFormData({ ...formData, show_info_bar: !formData.show_info_bar })
+                  }
+                >
+                  <div>
+                    <div className="toggle-label">Exibir Barra de Informações</div>
+                    <div className="toggle-desc">
+                      Apresenta relógio, clima e letreiro institucional no rodapé da TV
+                    </div>
+                  </div>
+                  <div className={`toggle-track ${formData.show_info_bar ? 'on' : ''}`}>
+                    <div className="toggle-thumb" />
+                  </div>
+                </div>
+
+                {formData.show_info_bar && (
+                  <div className="form-section">
+                    <div className="input-group">
+                      <label className="input-label">Assinatura da Unidade na TV</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ex: Academia GymPlay — Unidade Centro"
+                        value={formData.establishment_name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, establishment_name: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="input-group">
+                      <label className="input-label">Mensagem do Letreiro (Rodapé)</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ex: Anuncie sua marca aqui — Fale com a recepção"
+                        value={formData.advertisement_text}
+                        onChange={(e) =>
+                          setFormData({ ...formData, advertisement_text: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setIsModalOpen(false)}
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSaving}>
-                  {isSaving ? 'Salvando...' : 'Salvar Terminal'}
+                <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                  {isSaving ? <div className="loader" /> : 'Salvar Terminal'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <style>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 1rem;
-        }
-        .modal-content {
-          animation: modalAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        @keyframes modalAppear {
-          from { opacity: 0; transform: scale(0.96) translateY(12px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes fadeInSlide {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .icon-btn {
-          background: rgba(255, 255, 255, 0.05);
-          border: none;
-          color: var(--text-muted);
-          padding: 0.5rem;
-          border-radius: 6px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-        }
-        .icon-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
-          color: white;
-        }
-        .icon-btn.text-danger:hover {
-          background: rgba(239, 68, 68, 0.1);
-          color: var(--danger-color);
-        }
-      `}</style>
     </div>
   );
 }
