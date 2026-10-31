@@ -80,7 +80,7 @@ html[data-theme="dark"] {
   /* Shell Dimensions */
   --sidebar-w: 254px;
   --topbar-h:  58px;
-  --sidebar-header-h: 104px;
+  --sidebar-header-h: 136px;
 
   /* Legacy Fallback Aliases (prevents regressions across sub-views) */
   --bg-color:      var(--bg-base);
@@ -235,7 +235,7 @@ button, input, select, textarea { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   position: relative;
@@ -248,13 +248,23 @@ button, input, select, textarea { font-family: inherit; }
   width: 100%;
 }
 
+.sidebar-logo a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sidebar-logo img {
-  height: 80px;
-  max-width: 218px;
+  height: 112px;
+  max-width: 224px;
   width: auto;
   object-fit: contain;
   display: block;
   transition: transform var(--dur-fast) ease;
+}
+
+.sidebar-logo img:hover {
+  transform: scale(1.02);
 }
 
 .sidebar-close {

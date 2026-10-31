@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import {
@@ -76,10 +76,16 @@ export default function Layout() {
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <img
-              src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'}
-              alt="GYM PLAY"
-            />
+            <Link
+              to={userRole === 'partner' ? '/partner/dashboard' : userRole === 'advertiser' ? '/advertiser/dashboard' : '/dashboard'}
+              title="Início"
+              onClick={closeSidebar}
+            >
+              <img
+                src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'}
+                alt="GYM PLAY"
+              />
+            </Link>
           </div>
           <button
             className="sidebar-close"
