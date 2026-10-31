@@ -78,9 +78,9 @@ html[data-theme="dark"] {
   --dur-slow:    280ms;
 
   /* Shell Dimensions */
-  --sidebar-w: 254px;
+  --sidebar-w: 264px;
   --topbar-h:  58px;
-  --sidebar-header-h: 136px;
+  --sidebar-header-h: 170px;
 
   /* Legacy Fallback Aliases (prevents regressions across sub-views) */
   --bg-color:      var(--bg-base);
@@ -235,7 +235,7 @@ button, input, select, textarea { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   position: relative;
@@ -255,8 +255,8 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .sidebar-logo img {
-  height: 112px;
-  max-width: 224px;
+  height: 142px;
+  max-width: 236px;
   width: auto;
   object-fit: contain;
   display: block;
