@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type FormEvent } from 'react';
+import { useEffect, useState, useMemo, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import {
@@ -16,7 +16,10 @@ import {
   Image as ImageIcon,
   Check,
   Link,
-  Percent
+  Percent,
+  Play,
+  Upload,
+  ExternalLink
 } from 'lucide-react';
 
 interface Advertiser {
@@ -73,6 +76,9 @@ export default function AdvertiserManagement() {
   const [selectedLibraryId, setSelectedLibraryId] = useState('');
   const [mediaModalLoading, setMediaModalLoading] = useState(false);
   const [allMediaCounts, setAllMediaCounts] = useState<Record<string, number>>({});
+  const [previewMediaItem, setPreviewMediaItem] = useState<{ url: string; name: string; type: string; size?: number; date?: string } | null>(null);
+  const [uploadingAdvMedia, setUploadingAdvMedia] = useState(false);
+  const advFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = async (isRefresh = false) => {
     if (isRefresh) {
@@ -131,6 +137,39 @@ export default function AdvertiserManagement() {
     return map;
   }, [partners]);
 
+  const resolveSignedUrls = async (items: any[]) => {
+    const paths = items.map((item: any) => item.file_path).filter(Boolean);
+    const signedMap: Record<string, string> = {};
+
+    if (paths.length > 0) {
+      try {
+        const { data: signedList } = await supabase.storage
+          .from('media')
+          .createSignedUrls(paths, 86400);
+
+        (signedList || []).forEach((s: any, idx: number) => {
+          const p = s.path || paths[idx];
+          if (p && s.signedUrl) {
+            signedMap[p] = s.signedUrl;
+          }
+        });
+      } catch (signErr) {
+        console.warn('Erro ao gerar URLs assinadas em lote:', signErr);
+      }
+    }
+
+    return items.map((item: any) => {
+      let playUrl = item.url || (item.file_path ? signedMap[item.file_path] : null);
+      if (!playUrl && item.file_path) {
+        const { data: publicUrlData } = supabase.storage
+          .from('media')
+          .getPublicUrl(item.file_path);
+        playUrl = publicUrlData?.publicUrl;
+      }
+      return { ...item, playUrl, publicUrl: playUrl };
+    });
+  };
+
   const loadAdvMedias = async (advId: string) => {
     const { data } = await supabase
       .from('media_files')
@@ -138,17 +177,66 @@ export default function AdvertiserManagement() {
       .eq('advertiser_id', advId)
       .order('created_at', { ascending: false });
     if (data) {
-      setAdvMediaList(data);
+      const enriched = await resolveSignedUrls(data);
+      setAdvMediaList(enriched);
       setAllMediaCounts(prev => ({ ...prev, [advId]: data.length }));
+    } else {
+      setAdvMediaList([]);
     }
   };
 
   const loadLibraryMedias = async () => {
     const { data } = await supabase
       .from('media_files')
-      .select('id, name, original_name, file_type, advertiser_id')
+      .select('*')
+      .is('partner_id', null)
       .order('created_at', { ascending: false });
-    if (data) setLibraryMedias(data);
+    if (data) {
+      const enriched = await resolveSignedUrls(data);
+      setLibraryMedias(enriched);
+    } else {
+      setLibraryMedias([]);
+    }
+  };
+
+  const handleUploadAdvMedia = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedAdvForMedia) return;
+
+    setUploadingAdvMedia(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `advertisers/${selectedAdvForMedia.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: adminData } = await supabase.from('users').select('org_id').eq('id', user?.id).single();
+
+      const { error: dbError } = await supabase.from('media_files').insert({
+        org_id: adminData?.org_id || '00000000-0000-0000-0000-000000000001',
+        name: file.name,
+        original_name: file.name,
+        file_path: filePath,
+        file_type: file.type,
+        file_size: file.size,
+        advertiser_id: selectedAdvForMedia.id,
+        status: 'approved'
+      });
+
+      if (dbError) throw dbError;
+
+      await loadAdvMedias(selectedAdvForMedia.id);
+      await loadLibraryMedias();
+      alert('Criativo enviado com sucesso e vinculado a este anunciante!');
+    } catch (err: any) {
+      console.error('Erro ao enviar mídia:', err);
+      alert('Erro ao enviar mídia: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setUploadingAdvMedia(false);
+      if (advFileInputRef.current) advFileInputRef.current.value = '';
+    }
   };
 
   const handleOpenMediaModal = async (adv: Advertiser) => {
@@ -758,13 +846,33 @@ export default function AdvertiserManagement() {
                   ID #{selectedAdvForMedia.id.slice(0, 8)} · {advMediaList.length} arquivo(s) vinculado(s)
                 </p>
               </div>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setSelectedAdvForMedia(null)}
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="file"
+                  ref={advFileInputRef}
+                  style={{ display: 'none' }}
+                  accept="video/mp4,image/jpeg,image/png,image/webp"
+                  onChange={handleUploadAdvMedia}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => advFileInputRef.current?.click()}
+                  disabled={uploadingAdvMedia}
+                  title="Fazer upload de um vídeo ou imagem para este anunciante"
+                >
+                  <Upload size={13} />
+                  <span>{uploadingAdvMedia ? 'Enviando...' : 'Enviar Criativo'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setSelectedAdvForMedia(null)}
+                  aria-label="Fechar modal"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             <div className="modal-body">
@@ -780,7 +888,7 @@ export default function AdvertiserManagement() {
                   </div>
                   <div className="empty-state-title">Nenhuma mídia atribuída</div>
                   <div className="empty-state-desc">
-                    Selecione um arquivo da biblioteca geral abaixo para vincular a este anunciante.
+                    Faça o upload de um vídeo/imagem acima ou selecione um arquivo da biblioteca geral abaixo para vincular a este anunciante.
                   </div>
                 </div>
               ) : (
@@ -806,28 +914,117 @@ export default function AdvertiserManagement() {
                           flexWrap: 'wrap'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '200px' }}>
-                          <div className="entity-avatar">
-                            {isVideo ? <Film size={14} /> : <ImageIcon size={14} />}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '220px' }}>
+                          {/* Miniatura / Frame do Vídeo ou Imagem */}
+                          <div
+                            style={{
+                              width: '64px',
+                              height: '44px',
+                              borderRadius: '6px',
+                              overflow: 'hidden',
+                              background: '#0a0a0c',
+                              border: '1px solid var(--border-subtle)',
+                              position: 'relative',
+                              cursor: m.playUrl ? 'pointer' : 'default',
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onClick={() =>
+                              m.playUrl &&
+                              setPreviewMediaItem({
+                                url: m.playUrl,
+                                name: m.name || m.original_name || 'Criativo',
+                                type: m.file_type || (isVideo ? 'video/mp4' : 'image/png'),
+                                size: m.file_size,
+                                date: m.created_at
+                              })
+                            }
+                            title="Clique para assistir ou visualizar imagem"
+                          >
+                            {m.playUrl ? (
+                              isVideo ? (
+                                <video
+                                  src={`${m.playUrl}#t=0.1`}
+                                  muted
+                                  playsInline
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <img
+                                  src={m.playUrl}
+                                  alt={m.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              )
+                            ) : (
+                              <div style={{ color: 'var(--text-tertiary)' }}>
+                                {isVideo ? <Film size={18} /> : <ImageIcon size={18} />}
+                              </div>
+                            )}
+                            {m.playUrl && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  background: 'rgba(0,0,0,0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <Play size={13} style={{ color: '#fff', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))' }} />
+                              </div>
+                            )}
                           </div>
-                          <div style={{ minWidth: 0 }}>
+
+                          <div style={{ minWidth: 0, flex: 1 }}>
                             <div
                               className="cell-primary"
                               style={{
+                                fontWeight: 600,
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis'
                               }}
+                              title={m.name || m.original_name}
                             >
                               {m.name || m.original_name || 'Sem nome'}
                             </div>
-                            <div className="cell-secondary">
-                              {isVideo ? 'Vídeo MP4' : 'Imagem'} · {m.duration || 15}s
+                            <div className="cell-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', marginTop: '2px' }}>
+                              <span>{isVideo ? 'Vídeo MP4' : 'Imagem'}</span>
+                              {m.file_size && (
+                                <span>· {(m.file_size / (1024 * 1024)).toFixed(1)} MB</span>
+                              )}
+                              {m.duration && <span>· {m.duration}s</span>}
                             </div>
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {/* Botão Visualizar */}
+                          {m.playUrl && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() =>
+                                setPreviewMediaItem({
+                                  url: m.playUrl,
+                                  name: m.name || m.original_name || 'Criativo',
+                                  type: m.file_type || (isVideo ? 'video/mp4' : 'image/png'),
+                                  size: m.file_size,
+                                  date: m.created_at
+                                })
+                              }
+                              title="Visualizar vídeo/imagem em tamanho real"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                            >
+                              <Play size={11} />
+                              <span>Visualizar</span>
+                            </button>
+                          )}
+
                           {isApproved && (
                             <span className="badge badge-success">
                               <span className="status-dot online" />
@@ -852,7 +1049,7 @@ export default function AdvertiserManagement() {
                               type="button"
                               className="btn btn-success btn-sm"
                               onClick={() => handleUpdateMediaStatus(m.id, 'approved')}
-                              title="Aprovar criativo"
+                              title="Aprovar criativo para o acervo"
                             >
                               <Check size={12} />
                               <span>Aprovar</span>
@@ -886,12 +1083,15 @@ export default function AdvertiserManagement() {
                 </div>
               )}
 
-              {/* Vincular Criativo da Biblioteca */}
+              {/* Vincular Criativo da Biblioteca Geral / Acervo */}
               <div className="form-section">
                 <div className="form-section-header">
                   <span className="form-section-title">
                     <Link size={14} />
-                    <span>Vincular Criativo da Biblioteca Geral</span>
+                    <span>Vincular Criativo do Acervo Geral</span>
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                    {libraryMedias.length} mídias no acervo
                   </span>
                 </div>
 
@@ -902,13 +1102,21 @@ export default function AdvertiserManagement() {
                     onChange={e => setSelectedLibraryId(e.target.value)}
                     style={{ flex: 1, minWidth: '220px' }}
                   >
-                    <option value="">Selecione um arquivo do acervo...</option>
-                    {libraryMedias.map(libM => (
-                      <option key={libM.id} value={libM.id}>
-                        {libM.name || libM.original_name || 'Sem nome'}
-                        {libM.advertiser_id === selectedAdvForMedia.id ? ' (Já vinculado)' : ''}
-                      </option>
-                    ))}
+                    <option value="">Selecione um arquivo do acervo geral...</option>
+                    {libraryMedias.map(libM => {
+                      const isLinkedToThis = libM.advertiser_id === selectedAdvForMedia.id;
+                      const isLinkedToOther = libM.advertiser_id && !isLinkedToThis;
+                      return (
+                        <option key={libM.id} value={libM.id}>
+                          {libM.name || libM.original_name || 'Sem nome'}
+                          {isLinkedToThis
+                            ? ' (Já vinculado a este anunciante)'
+                            : isLinkedToOther
+                            ? ' (Vinculado a outro anunciante)'
+                            : ' [Disponível no acervo]'}
+                        </option>
+                      );
+                    })}
                   </select>
                   <button
                     type="button"
@@ -917,9 +1125,13 @@ export default function AdvertiserManagement() {
                     className="btn btn-primary"
                   >
                     <Link size={14} />
-                    <span>Vincular e Aprovar</span>
+                    <span>Vincular ao Anunciante</span>
                   </button>
                 </div>
+
+                <p style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '8px', marginBottom: 0 }}>
+                  💡 <strong>Dica de Transmissão:</strong> Mídias com status <em>Aprovada</em> ficam disponíveis automaticamente na <strong>Biblioteca de Mídias</strong> e podem ser adicionadas diretamente na <strong>Grade / Playlists das TVs</strong> em Operação &gt; Playlists.
+                </p>
               </div>
             </div>
 
@@ -928,6 +1140,107 @@ export default function AdvertiserManagement() {
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setSelectedAdvForMedia(null)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Pré-Visualização de Vídeo / Imagem em Tamanho Real */}
+      {previewMediaItem && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 99999 }}
+          onClick={() => setPreviewMediaItem(null)}
+        >
+          <div
+            className="modal modal-lg"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '820px', padding: 0, overflow: 'hidden' }}
+          >
+            <div
+              className="modal-header"
+              style={{
+                padding: '14px 20px',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div>
+                <h3 className="modal-title" style={{ fontSize: '15px' }}>
+                  {previewMediaItem.name}
+                </h3>
+                <span className="cell-secondary" style={{ fontSize: '11px' }}>
+                  {previewMediaItem.type?.includes('video') ? 'Vídeo Publicitário MP4' : 'Criativo Imagem'}
+                  {previewMediaItem.size ? ` · ${(previewMediaItem.size / (1024 * 1024)).toFixed(2)} MB` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setPreviewMediaItem(null)}
+                aria-label="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                background: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '340px',
+                maxHeight: '68vh',
+                overflow: 'hidden'
+              }}
+            >
+              {previewMediaItem.type?.includes('video') ? (
+                <video
+                  src={previewMediaItem.url}
+                  controls
+                  autoPlay
+                  playsInline
+                  style={{ width: '100%', maxHeight: '68vh', objectFit: 'contain' }}
+                />
+              ) : (
+                <img
+                  src={previewMediaItem.url}
+                  alt={previewMediaItem.name}
+                  style={{ width: '100%', maxHeight: '68vh', objectFit: 'contain' }}
+                />
+              )}
+            </div>
+
+            <div
+              className="modal-footer"
+              style={{
+                padding: '12px 20px',
+                borderTop: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <a
+                href={previewMediaItem.url}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-ghost btn-sm"
+              >
+                <ExternalLink size={13} />
+                <span>Abrir em Nova Guia</span>
+              </a>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setPreviewMediaItem(null)}
               >
                 Fechar
               </button>
